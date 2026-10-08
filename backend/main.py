@@ -61,7 +61,7 @@ async def upload(file: UploadFile = File(...)):
         raise HTTPException(400, f"PDF 解析失败: {e}") from e
     pages = [storage.new_page_entry(i, info["file"], info["width"], info["height"])
              for i, info in enumerate(infos)]
-    project = {"id": pid, "name": file.filename, "target_lang": "zh", "vertical": False, "pages": pages}
+    project = {"id": pid, "name": file.filename, "target_lang": "zh", "vertical": True, "pages": pages}
     storage.save_project(project)
     return project
 
