@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Bubble, Page, Project } from '../types';
-import { renderPage, saveBubble, deleteBubble } from '../api';
+import { renderPage, saveBubble } from '../api';
 
 interface Props {
   project: Project;
@@ -8,11 +8,11 @@ interface Props {
   selectedBubble: Bubble | null;
   onProjectUpdate: (p: Project) => void;
   onRendered: () => void;
-  onBubbleDeleted: () => void;
+  onDeleteBubble: (bid: string) => Promise<void>;
   locked: boolean;
 }
 
-export default function BubblePanel({ project, page, selectedBubble, onProjectUpdate, onRendered, onBubbleDeleted, locked }: Props) {
+export default function BubblePanel({ project, page, selectedBubble, onProjectUpdate, onRendered, onDeleteBubble, locked }: Props) {
   const [text, setText] = useState('');
   const [box, setBox] = useState<[number, number, number, number]>([0, 0, 0, 0]);
   const [fontSize, setFontSize] = useState('');
@@ -118,21 +118,6 @@ export default function BubblePanel({ project, page, selectedBubble, onProjectUp
     }
   }
 
-  async function handleDelete() {
-    if (!selectedBubble) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const updatedPage = await deleteBubble(project.id, page.id, selectedBubble.id);
-      onProjectUpdate({ ...project, pages: project.pages.map(p => (p.id === updatedPage.id ? updatedPage : p)) });
-      onBubbleDeleted();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <aside className="bubble-panel">
       <h3>气泡 {selectedBubble.id} {selectedBubble.edited && <span className="edited-tag">已手动编辑</span>}</h3>
@@ -182,7 +167,7 @@ export default function BubblePanel({ project, page, selectedBubble, onProjectUp
         <button className="primary" disabled={busy || locked} onClick={() => handleSave(true)}>保存并重新渲染</button>
         {saved && <span className="saved-flag">已保存 ✓</span>}
       </div>
-      <button className="danger" disabled={busy || locked} onClick={handleDelete}>
+      <button className="danger" disabled={busy || locked} onClick={() => onDeleteBubble(selectedBubble.id)}>
         删除此气泡
       </button>
     </aside>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BatchStatus, Bubble, Page, Project } from './types';
-import { deleteBubble, getProject, listProjects, saveBubble, setTargetLang, uploadPdf } from './api';
+import { deleteBubble, getProject, listProjects, renderPage, saveBubble, setTargetLang, uploadPdf } from './api';
 import PageSidebar from './components/PageSidebar';
 import PageViewer from './components/PageViewer';
 import BubblePanel from './components/BubblePanel';
@@ -36,6 +36,27 @@ export default function App() {
   const page: Page | null = project?.pages.find(p => p.id === selectedPageId) ?? null;
   const bubble: Bubble | null = page?.bubbles.find(b => b.id === selectedBubbleId) ?? null;
 
+  // delete a bubble; if the page already has a rendered output, re-render it automatically
+  async function deleteBubbleAndRefresh(bid: string) {
+    if (!project || !page) return;
+    try {
+      const updatedPage = await deleteBubble(project.id, page.id, bid);
+      let next: Project = {
+        ...project,
+        pages: project.pages.map(p => (p.id === updatedPage.id ? updatedPage : p)),
+      };
+      if (updatedPage.status === 'rendered') {
+        const res = await renderPage(project.id, page.id);
+        next = { ...next, pages: next.pages.map(p => (p.id === res.page.id ? res.page : p)) };
+        setRenderStamp(Date.now());
+      }
+      setSelectedBubbleId(null);
+      setProject(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   // Backspace/Delete removes the selected bubble (unless typing in a field)
   const bubbleRef = useRef(bubble);
   bubbleRef.current = bubble;
@@ -46,24 +67,15 @@ export default function App() {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable) return;
       const b = bubbleRef.current;
-      const proj = project, pg = page;
-      if (!b || !proj || !pg || isLocked(pg.id) || deletingRef.current) return;
+      const pg = page;
+      if (!b || !pg || isLocked(pg.id) || deletingRef.current) return;
       e.preventDefault();
       deletingRef.current = true;
-      deleteBubble(proj.id, pg.id, b.id)
-        .then(updatedPage => {
-          setProject({
-            ...proj,
-            pages: proj.pages.map(p => (p.id === updatedPage.id ? updatedPage : p)),
-          });
-          setSelectedBubbleId(null);
-        })
-        .catch(err => setError(err instanceof Error ? err.message : String(err)))
-        .finally(() => { deletingRef.current = false; });
+      deleteBubbleAndRefresh(b.id).finally(() => { deletingRef.current = false; });
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [project, page, isLocked]);
+  }, [page, isLocked]);
 
   async function handleUpload(file: File) {
     setBusy(true);
@@ -176,7 +188,7 @@ export default function App() {
               selectedBubble={bubble}
               onProjectUpdate={setProject}
               onRendered={handleRendered}
-              onBubbleDeleted={() => setSelectedBubbleId(null)}
+              onDeleteBubble={deleteBubbleAndRefresh}
               locked={isLocked(page.id)}
             />
             <BatchPanel
