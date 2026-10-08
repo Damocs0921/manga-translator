@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Bubble, Page, Project } from '../types';
-import { renderPage, saveBubble } from '../api';
+import { renderPage, saveBubble, deleteBubble } from '../api';
 
 interface Props {
   project: Project;
@@ -8,18 +8,62 @@ interface Props {
   selectedBubble: Bubble | null;
   onProjectUpdate: (p: Project) => void;
   onRendered: () => void;
+  onBubbleDeleted: () => void;
   locked: boolean;
 }
 
-export default function BubblePanel({ project, page, selectedBubble, onProjectUpdate, onRendered, locked }: Props) {
+export default function BubblePanel({ project, page, selectedBubble, onProjectUpdate, onRendered, onBubbleDeleted, locked }: Props) {
   const [text, setText] = useState('');
+  const [box, setBox] = useState<[number, number, number, number]>([0, 0, 0, 0]);
+  const [fontSize, setFontSize] = useState('');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // true when the user typed a geometry edit not yet auto-saved
+  const geomDirty = useRef(false);
 
+  // switch bubble: reset all editor state
   useEffect(() => {
+    geomDirty.current = false;
     setText(selectedBubble?.translated_text ?? '');
+    setBox(selectedBubble ? [...selectedBubble.box] : [0, 0, 0, 0]);
+    setFontSize(selectedBubble?.font_size ? String(selectedBubble.font_size) : '');
     setSaved(false);
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBubble?.id]);
+
+  // same bubble, box changed elsewhere (e.g. dragged in viewer): sync inputs only
+  useEffect(() => {
+    if (selectedBubble) setBox([...selectedBubble.box]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBubble?.box]);
+
+  // auto-save geometry (box / font_size) shortly after the user stops editing
+  useEffect(() => {
+    if (!selectedBubble || locked || !geomDirty.current) return;
+    const [x, y, w, h] = box;
+    if (![x, y, w, h].every(Number.isFinite) || w < 10 || h < 10) return;
+    const fs = fontSize.trim() === '' ? null : Number(fontSize);
+    if (fs !== null && (!Number.isFinite(fs) || fs < 6 || fs > 200)) return;
+    const t = setTimeout(async () => {
+      geomDirty.current = false;
+      try {
+        const updated = await saveBubble(project.id, page.id, selectedBubble.id, { box, font_size: fs });
+        onProjectUpdate({
+          ...project,
+          pages: project.pages.map(p =>
+            p.id === page.id ? { ...p, bubbles: p.bubbles.map(b => (b.id === updated.id ? updated : b)) } : p,
+          ),
+        });
+        setSaved(true);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    }, 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [box, fontSize, selectedBubble?.id]);
 
   if (!selectedBubble) {
     return (
@@ -30,11 +74,29 @@ export default function BubblePanel({ project, page, selectedBubble, onProjectUp
     );
   }
 
+  function setBoxAt(i: number, v: string) {
+    const n = Number(v);
+    const next = [...box] as [number, number, number, number];
+    next[i] = Number.isFinite(n) ? Math.round(n) : 0;
+    setBox(next);
+    setSaved(false);
+    geomDirty.current = true;
+  }
+
   async function handleSave(reRender: boolean) {
     if (!selectedBubble) return;
     setBusy(true);
+    setError(null);
     try {
-      const updated = await saveBubble(project.id, page.id, selectedBubble.id, text);
+      const fs = fontSize.trim() === '' ? null : Number(fontSize);
+      if (fs !== null && (!Number.isFinite(fs) || fs < 6 || fs > 200)) {
+        throw new Error('字号须为 6-200 的数字，或留空表示自动');
+      }
+      const updated = await saveBubble(project.id, page.id, selectedBubble.id, {
+        translated_text: text,
+        box,
+        font_size: fs,
+      });
       const newProject: Project = {
         ...project,
         pages: project.pages.map(p =>
@@ -49,6 +111,23 @@ export default function BubblePanel({ project, page, selectedBubble, onProjectUp
       }
       onProjectUpdate(newProject);
       setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!selectedBubble) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updatedPage = await deleteBubble(project.id, page.id, selectedBubble.id);
+      onProjectUpdate({ ...project, pages: project.pages.map(p => (p.id === updatedPage.id ? updatedPage : p)) });
+      onBubbleDeleted();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -67,11 +146,45 @@ export default function BubblePanel({ project, page, selectedBubble, onProjectUp
         placeholder={locked ? '🔒 批量处理中，暂不可编辑' : '输入译文…'}
         disabled={locked}
       />
+      <label>位置与大小（拖拽或输入，改动自动保存）</label>
+      <div className="box-editor">
+        {(['X', 'Y', '宽', '高'] as const).map((label, i) => (
+          <span key={label} className="box-field">
+            <em>{label}</em>
+            <input
+              type="number"
+              value={box[i]}
+              min={i >= 2 ? 10 : undefined}
+              disabled={locked}
+              onChange={e => setBoxAt(i, e.target.value)}
+            />
+          </span>
+        ))}
+      </div>
+      <label>译文字号（留空 = 自动适配，改动自动保存）</label>
+      <div className="box-editor">
+        <span className="box-field">
+          <em>字号</em>
+          <input
+            type="number"
+            value={fontSize}
+            placeholder="自动"
+            min={6}
+            max={200}
+            disabled={locked}
+            onChange={e => { setFontSize(e.target.value); setSaved(false); geomDirty.current = true; }}
+          />
+        </span>
+      </div>
+      {error && <div className="error">{error}</div>}
       <div className="panel-actions">
-        <button disabled={busy || locked} onClick={() => handleSave(false)}>{busy ? '保存中…' : '保存译文'}</button>
+        <button disabled={busy || locked} onClick={() => handleSave(false)}>{busy ? '保存中…' : '保存'}</button>
         <button className="primary" disabled={busy || locked} onClick={() => handleSave(true)}>保存并重新渲染</button>
         {saved && <span className="saved-flag">已保存 ✓</span>}
       </div>
+      <button className="danger" disabled={busy || locked} onClick={() => { if (confirm(`删除气泡 ${selectedBubble.id}？`)) handleDelete(); }}>
+        删除此气泡
+      </button>
     </aside>
   );
 }

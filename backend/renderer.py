@@ -19,28 +19,6 @@ def _load_font(size: int) -> ImageFont.FreeTypeFont:
     return _font_cache[size]
 
 
-def _bg_color(img: Image.Image, box: list[int]) -> tuple:
-    """Sample border pixels of the bubble region to pick the fill color."""
-    x, y, w, h = box
-    px = img.load()
-    samples = []
-    coords = (
-        [(xx, y + 1) for xx in range(max(0, x), min(img.width, x + w), max(1, w // 8))]
-        + [(xx, min(img.height - 1, y + h - 1)) for xx in range(max(0, x), min(img.width, x + w), max(1, w // 8))]
-        + [(x + 1, yy) for yy in range(max(0, y), min(img.height, y + h), max(1, h // 8))]
-        + [(min(img.width - 1, x + w - 1), yy) for yy in range(max(0, y), min(img.height, y + h), max(1, h // 8))]
-    )
-    for c in coords:
-        if 0 <= c[0] < img.width and 0 <= c[1] < img.height:
-            samples.append(px[c[0], c[1]])
-    if not samples:
-        return (255, 255, 255)
-    r = sum(s[0] for s in samples) // len(samples)
-    g = sum(s[1] for s in samples) // len(samples)
-    b = sum(s[2] for s in samples) // len(samples)
-    return (r, g, b)
-
-
 def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
     lines: list[str] = []
     for para in text.split("\n"):
@@ -85,13 +63,20 @@ def render_page(page_path: Path, out_path: Path, bubbles: list[dict[str, Any]]) 
             continue
         x, y, w, h = b["box"]
         pad_box = 3
-        fill = _bg_color(img, b["box"])
+        # unified white background under translated text
         draw.rectangle(
             [x + pad_box, y + pad_box, min(img.width, x + w - pad_box), min(img.height, y + h - pad_box)],
-            fill=fill,
+            fill=(255, 255, 255),
         )
         text_pad = max(4, min(w, h) // 12)
-        font, lines, line_h = _fit_text(draw, b["translated_text"], w, h, text_pad)
+        fs = b.get("font_size")
+        if fs:
+            # user-specified fixed font size: wrap to box width at that size
+            font = _load_font(int(fs))
+            lines = _wrap(draw, b["translated_text"], font, w - 2 * text_pad)
+            line_h = int(fs * 1.35)
+        else:
+            font, lines, line_h = _fit_text(draw, b["translated_text"], w, h, text_pad)
         total_h = len(lines) * line_h
         ty = y + (h - total_h) // 2
         for line in lines:

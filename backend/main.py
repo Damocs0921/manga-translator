@@ -143,12 +143,37 @@ async def edit_bubble(pid: str, page_id: str, bid: str, body: dict):
     bubble = next((b for b in page["bubbles"] if b["id"] == bid), None)
     if not bubble:
         raise HTTPException(404, f"bubble {bid} not found")
-    if "translated_text" not in body:
-        raise HTTPException(400, "缺少 translated_text")
-    bubble["translated_text"] = body["translated_text"]
-    bubble["edited"] = True
+    if not any(k in body for k in ("translated_text", "box", "font_size")):
+        raise HTTPException(400, "缺少 translated_text / box / font_size 之一")
+    if "box" in body:
+        box = body["box"]
+        if not isinstance(box, list) or len(box) != 4 or not all(isinstance(v, (int, float)) for v in box):
+            raise HTTPException(400, "box 必须是 [x, y, w, h] 四个数字")
+        if box[2] < 10 or box[3] < 10:
+            raise HTTPException(400, "气泡宽高不能小于 10px")
+        bubble["box"] = [int(round(v)) for v in box]
+    if "font_size" in body:
+        fs = body["font_size"]
+        if fs is not None and (not isinstance(fs, (int, float)) or not 6 <= fs <= 200):
+            raise HTTPException(400, "font_size 须为 6-200 的数字或 null（自动）")
+        bubble["font_size"] = int(fs) if fs is not None else None
+    if "translated_text" in body:
+        bubble["translated_text"] = body["translated_text"]
+        bubble["edited"] = True
     storage.save_project(proj)
     return bubble
+
+
+@app.delete("/api/projects/{pid}/pages/{page_id}/bubbles/{bid}")
+async def delete_bubble(pid: str, page_id: str, bid: str):
+    proj = _require_project(pid)
+    page = _require_page(proj, page_id)
+    before = len(page["bubbles"])
+    page["bubbles"] = [b for b in page["bubbles"] if b["id"] != bid]
+    if len(page["bubbles"]) == before:
+        raise HTTPException(404, f"bubble {bid} not found")
+    storage.save_project(proj)
+    return page
 
 
 @app.post("/api/projects/{pid}/pages/{page_id}/render")

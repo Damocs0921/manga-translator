@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { BatchStatus, Bubble, Page, Project } from './types';
-import { getProject, listProjects, setTargetLang, uploadPdf } from './api';
+import { getProject, listProjects, saveBubble, setTargetLang, uploadPdf } from './api';
 import PageSidebar from './components/PageSidebar';
 import PageViewer from './components/PageViewer';
 import BubblePanel from './components/BubblePanel';
@@ -115,6 +115,20 @@ export default function App() {
               onProjectUpdate={setProject}
               onRendered={() => setViewMode('output')}
               onTranslated={p => setSelectedBubbleId(p.bubbles[0]?.id ?? null)}
+              onBubbleGeometry={async (bid, box) => {
+                if (!project || !page) return;
+                try {
+                  const updated = await saveBubble(project.id, page.id, bid, { box });
+                  setProject({
+                    ...project,
+                    pages: project.pages.map(p =>
+                      p.id === page.id ? { ...p, bubbles: p.bubbles.map(b => (b.id === updated.id ? updated : b)) } : p,
+                    ),
+                  });
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : String(e));
+                }
+              }}
               locked={isLocked(page.id)}
               lockHint={lockHintFor(page.id)}
             />
@@ -126,6 +140,7 @@ export default function App() {
               selectedBubble={bubble}
               onProjectUpdate={setProject}
               onRendered={() => setViewMode('output')}
+              onBubbleDeleted={() => setSelectedBubbleId(null)}
               locked={isLocked(page.id)}
             />
             <BatchPanel project={project} onProjectUpdate={setProject} onStatusChange={setBatchStatus} />

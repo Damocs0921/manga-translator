@@ -4,6 +4,7 @@ export interface Bubble {
   source_text: string;
   translated_text: string;
   edited: boolean;
+  font_size?: number | null; // null/undefined = auto-fit
 }
 
 export interface Page {

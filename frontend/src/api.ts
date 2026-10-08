@@ -40,15 +40,27 @@ export async function translatePage(pid: string, pageId: string): Promise<Page> 
   return json<Page>(await fetch(`${BASE}/projects/${pid}/pages/${pageId}/translate`, { method: 'POST' }));
 }
 
+export interface BubblePatch {
+  translated_text?: string;
+  box?: number[];
+  font_size?: number | null;
+}
+
 export async function saveBubble(
-  pid: string, pageId: string, bid: string, translated_text: string,
+  pid: string, pageId: string, bid: string, patch: BubblePatch,
 ): Promise<Bubble> {
   return json<Bubble>(
     await fetch(`${BASE}/projects/${pid}/pages/${pageId}/bubbles/${bid}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ translated_text }),
+      body: JSON.stringify(patch),
     }),
+  );
+}
+
+export async function deleteBubble(pid: string, pageId: string, bid: string): Promise<Page> {
+  return json<Page>(
+    await fetch(`${BASE}/projects/${pid}/pages/${pageId}/bubbles/${bid}`, { method: 'DELETE' }),
   );
 }
 
