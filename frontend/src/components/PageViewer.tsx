@@ -14,6 +14,7 @@ interface Props {
   onBubbleGeometry: (bid: string, box: [number, number, number, number]) => void;
   locked: boolean;
   lockHint?: string;
+  renderStamp: number; // bump to bust output-image cache
 }
 
 type Box = [number, number, number, number];
@@ -29,10 +30,9 @@ interface DragState {
 
 const HANDLE = 26; // resize-handle size in image pixels
 
-export default function PageViewer({ project, page, onBubbleClick, selectedBubbleId, viewMode, onProjectUpdate, onRendered, onTranslated, onBubbleGeometry, locked, lockHint }: Props) {
+export default function PageViewer({ project, page, onBubbleClick, selectedBubbleId, viewMode, onProjectUpdate, onRendered, onTranslated, onBubbleGeometry, locked, lockHint, renderStamp }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [outputStamp, setOutputStamp] = useState(0);
   const [drag, setDrag] = useState<DragState | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -54,7 +54,7 @@ export default function PageViewer({ project, page, onBubbleClick, selectedBubbl
 
   const imgSrc = viewMode === 'source'
     ? pageImageUrl(project.id, page.id)
-    : `${pageOutputUrl(project.id, page.id)}?t=${outputStamp}`;
+    : `${pageOutputUrl(project.id, page.id)}?t=${renderStamp}`;
 
   // ---- bubble drag / resize ----
   function ptFromEvent(e: React.PointerEvent) {
@@ -128,7 +128,6 @@ export default function PageViewer({ project, page, onBubbleClick, selectedBubbl
                   disabled={!!busy || !page.bubbles.length}
                   onClick={() => run('render', async () => {
                     applyPage((await renderPage(project.id, page.id)).page);
-                    setOutputStamp(Date.now());
                     onRendered();
                   })}
                 >

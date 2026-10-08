@@ -182,7 +182,7 @@ export default function BubblePanel({ project, page, selectedBubble, onProjectUp
         <button className="primary" disabled={busy || locked} onClick={() => handleSave(true)}>保存并重新渲染</button>
         {saved && <span className="saved-flag">已保存 ✓</span>}
       </div>
-      <button className="danger" disabled={busy || locked} onClick={() => { if (confirm(`删除气泡 ${selectedBubble.id}？`)) handleDelete(); }}>
+      <button className="danger" disabled={busy || locked} onClick={handleDelete}>
         删除此气泡
       </button>
     </aside>

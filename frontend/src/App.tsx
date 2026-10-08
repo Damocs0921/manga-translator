@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { BatchStatus, Bubble, Page, Project } from './types';
-import { getProject, listProjects, saveBubble, setTargetLang, uploadPdf } from './api';
+import { deleteBubble, getProject, listProjects, saveBubble, setTargetLang, uploadPdf } from './api';
 import PageSidebar from './components/PageSidebar';
 import PageViewer from './components/PageViewer';
 import BubblePanel from './components/BubblePanel';
@@ -15,6 +15,12 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [batchStatus, setBatchStatus] = useState<BatchStatus>({ running: false, total: 0, done: 0, current: '', errors: [], page_ids: [] });
+  // bump whenever a page output is re-rendered, to bust the cached output image
+  const [renderStamp, setRenderStamp] = useState(Date.now());
+  const handleRendered = () => {
+    setViewMode('output');
+    setRenderStamp(Date.now());
+  };
   // only pages inside the batch queue (queued or in-progress) are locked
   const isLocked = (pageId: string | null): boolean =>
     !!pageId && batchStatus.running && batchStatus.page_ids.includes(pageId);
@@ -29,6 +35,35 @@ export default function App() {
 
   const page: Page | null = project?.pages.find(p => p.id === selectedPageId) ?? null;
   const bubble: Bubble | null = page?.bubbles.find(b => b.id === selectedBubbleId) ?? null;
+
+  // Backspace/Delete removes the selected bubble (unless typing in a field)
+  const bubbleRef = useRef(bubble);
+  bubbleRef.current = bubble;
+  const deletingRef = useRef(false);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable) return;
+      const b = bubbleRef.current;
+      const proj = project, pg = page;
+      if (!b || !proj || !pg || isLocked(pg.id) || deletingRef.current) return;
+      e.preventDefault();
+      deletingRef.current = true;
+      deleteBubble(proj.id, pg.id, b.id)
+        .then(updatedPage => {
+          setProject({
+            ...proj,
+            pages: proj.pages.map(p => (p.id === updatedPage.id ? updatedPage : p)),
+          });
+          setSelectedBubbleId(null);
+        })
+        .catch(err => setError(err instanceof Error ? err.message : String(err)))
+        .finally(() => { deletingRef.current = false; });
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [project, page, isLocked]);
 
   async function handleUpload(file: File) {
     setBusy(true);
@@ -113,7 +148,7 @@ export default function App() {
               viewMode={viewMode}
               onBubbleClick={b => setSelectedBubbleId(b.id === selectedBubbleId ? null : b.id)}
               onProjectUpdate={setProject}
-              onRendered={() => setViewMode('output')}
+              onRendered={handleRendered}
               onTranslated={p => setSelectedBubbleId(p.bubbles[0]?.id ?? null)}
               onBubbleGeometry={async (bid, box) => {
                 if (!project || !page) return;
@@ -131,6 +166,7 @@ export default function App() {
               }}
               locked={isLocked(page.id)}
               lockHint={lockHintFor(page.id)}
+              renderStamp={renderStamp}
             />
           )}
           <div className="right-col">
@@ -139,11 +175,15 @@ export default function App() {
               page={page}
               selectedBubble={bubble}
               onProjectUpdate={setProject}
-              onRendered={() => setViewMode('output')}
+              onRendered={handleRendered}
               onBubbleDeleted={() => setSelectedBubbleId(null)}
               locked={isLocked(page.id)}
             />
-            <BatchPanel project={project} onProjectUpdate={setProject} onStatusChange={setBatchStatus} />
+            <BatchPanel
+              project={project}
+              onProjectUpdate={p => { setProject(p); setRenderStamp(Date.now()); }}
+              onStatusChange={setBatchStatus}
+            />
           </div>
         </main>
       ) : (
