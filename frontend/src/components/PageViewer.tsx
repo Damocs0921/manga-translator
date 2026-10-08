@@ -47,28 +47,30 @@ export default function PageViewer({ project, page, onBubbleClick, selectedBubbl
         <span className="bubble-count">{page.bubbles.length} 个气泡</span>
         {locked
           ? <span className="lock-hint">🔒 {lockHint ?? '批量处理中，页面操作已锁定'}</span>
-          : <>
-              <button disabled={!!busy} onClick={() => run('detect', async () => applyPage(await detectPage(project.id, page.id)))}>
-                {busy === 'detect' ? '检测中…' : '检测气泡'}
-              </button>
-              <button disabled={!!busy || !page.bubbles.length} onClick={() => run('translate', async () => {
-                const updated = await translatePage(project.id, page.id);
-                applyPage(updated);
-                onTranslated(updated);
-              })}>
-                {busy === 'translate' ? '翻译中…' : 'AI 翻译'}
-              </button>
-              <button
-                disabled={!!busy || !page.bubbles.length}
-                onClick={() => run('render', async () => {
-                  applyPage((await renderPage(project.id, page.id)).page);
-                  setOutputStamp(Date.now());
-                  onRendered();
-                })}
-              >
-                {busy === 'render' ? '渲染中…' : '渲染译文图'}
-              </button>
-            </>
+          : viewMode === 'output'
+            ? <span className="hint">预览模式：切回「原图」可检测/翻译/编辑</span>
+            : <>
+                <button disabled={!!busy} onClick={() => run('detect', async () => applyPage(await detectPage(project.id, page.id)))}>
+                  {busy === 'detect' ? '检测中…' : '检测气泡'}
+                </button>
+                <button disabled={!!busy || !page.bubbles.length} onClick={() => run('translate', async () => {
+                  const updated = await translatePage(project.id, page.id);
+                  applyPage(updated);
+                  onTranslated(updated);
+                })}>
+                  {busy === 'translate' ? '翻译中…' : 'AI 翻译'}
+                </button>
+                <button
+                  disabled={!!busy || !page.bubbles.length}
+                  onClick={() => run('render', async () => {
+                    applyPage((await renderPage(project.id, page.id)).page);
+                    setOutputStamp(Date.now());
+                    onRendered();
+                  })}
+                >
+                  {busy === 'render' ? '渲染中…' : '渲染译文图'}
+                </button>
+              </>
         }
       </div>
       {error && <div className="error">{error}</div>}
@@ -86,9 +88,6 @@ export default function PageViewer({ project, page, onBubbleClick, selectedBubbl
                 />
               ))}
             </svg>
-          )}
-          {viewMode === 'output' && page.status !== 'rendered' && (
-            <div className="output-hint">尚未渲染译文图，点击上方「渲染译文图」生成</div>
           )}
         </div>
       </div>
