@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BatchStatus, Bubble, Page, Project } from './types';
-import { deleteBubble, getProject, listProjects, renderPage, saveBubble, setTargetLang, uploadPdf } from './api';
+import { deleteBubble, getProject, listProjects, renderPage, saveBubble, setTargetLang, setVertical, uploadPdf } from './api';
 import PageSidebar from './components/PageSidebar';
 import PageViewer from './components/PageViewer';
 import BubblePanel from './components/BubblePanel';
@@ -131,6 +131,18 @@ export default function App() {
               <option value="zh">日 → 中</option>
               <option value="en">日 → 英</option>
             </select>
+            <label className="vert-toggle" title="译文竖排（漫画风格，从右往左）">
+              <input
+                type="checkbox"
+                checked={!!project.vertical}
+                disabled={busy}
+                onChange={async e => {
+                  const p = await setVertical(project.id, e.target.checked);
+                  setProject(p);
+                }}
+              />
+              竖排
+            </label>
             <div className="view-toggle">
               <button className={viewMode === 'source' ? 'active' : ''} onClick={() => setViewMode('source')}>原图</button>
               <button className={viewMode === 'output' ? 'active' : ''} onClick={() => setViewMode('output')}>译文图</button>

@@ -32,6 +32,10 @@ export async function setTargetLang(pid: string, lang: 'zh' | 'en'): Promise<Pro
   return json<Project>(await fetch(`${BASE}/projects/${pid}/target_lang?lang=${lang}`, { method: 'PUT' }));
 }
 
+export async function setVertical(pid: string, vertical: boolean): Promise<Project> {
+  return json<Project>(await fetch(`${BASE}/projects/${pid}/vertical?vertical=${vertical}`, { method: 'PUT' }));
+}
+
 export async function detectPage(pid: string, pageId: string): Promise<Page> {
   return json<Page>(await fetch(`${BASE}/projects/${pid}/pages/${pageId}/detect`, { method: 'POST' }));
 }

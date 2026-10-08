@@ -20,6 +20,7 @@ export interface Project {
   id: string;
   name: string;
   target_lang: 'zh' | 'en';
+  vertical?: boolean; // render translated text vertically (manga style)
   pages: Page[];
 }
 

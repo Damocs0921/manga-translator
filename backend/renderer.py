@@ -55,7 +55,80 @@ def _fit_text(draw: ImageDraw.ImageDraw, text: str, box_w: int, box_h: int, pad:
     return best[0], best[1], best[2]
 
 
-def render_page(page_path: Path, out_path: Path, bubbles: list[dict[str, Any]]) -> None:
+def _fit_vertical(text: str, box_w: int, box_h: int, pad: int) -> int:
+    """Binary-search the largest font size whose vertical columns fit the box."""
+    n = len([c for c in text if not c.isspace()])
+    lo, hi, best = 8, 64, 8
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        adv = int(mid * 1.1)  # vertical advance per char
+        per_col = max(1, (box_h - 2 * pad) // adv)
+        cols = max(1, -(-n // per_col))
+        col_w = int(mid * 1.25)  # horizontal advance per column
+        if cols * col_w <= box_w - 2 * pad:
+            best = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return best
+
+
+def _is_upright(ch: str) -> bool:
+    """CJK & fullwidth chars stay upright; ASCII letters/digits get rotated."""
+    return not (ch.isascii() and not ch.isspace())
+
+
+def _draw_vertical(img: Image.Image, draw: ImageDraw.ImageDraw, text: str,
+                   font: ImageFont.FreeTypeFont, fs: int,
+                   x: int, y: int, w: int, h: int, pad: int) -> None:
+    """Draw text vertically: top-to-bottom, columns right-to-left, block centered in box."""
+    adv = int(fs * 1.1)
+    col_w = int(fs * 1.25)
+    per_col = max(1, (h - 2 * pad) // adv)
+    # split text into columns of at most per_col chars (\n forces a new column)
+    cols: list[list[str]] = []
+    cur: list[str] = []
+    for ch in text:
+        if ch == "\n":
+            if cur:
+                cols.append(cur)
+                cur = []
+            continue
+        if ch.isspace():
+            continue
+        cur.append(ch)
+        if len(cur) >= per_col:
+            cols.append(cur)
+            cur = []
+    if cur:
+        cols.append(cur)
+    if not cols:
+        return
+    # center the column block horizontally
+    total_w = len(cols) * col_w
+    block_right = x + (w + total_w) / 2
+    tmp_size = int(fs * 1.8)
+    for i, col in enumerate(cols):
+        # center each column vertically
+        col_h = len(col) * adv
+        cy = y + (h - col_h) / 2
+        cx = block_right - col_w / 2 - i * col_w  # center of this column
+        for ch in col:
+            if _is_upright(ch):
+                cw = draw.textlength(ch, font=font)
+                draw.text((cx - cw / 2, cy), ch, font=font, fill=(20, 20, 20))
+            else:
+                # ASCII char: draw on temp image and rotate 90° clockwise
+                tmp = Image.new("RGBA", (tmp_size, tmp_size), (0, 0, 0, 0))
+                td = ImageDraw.Draw(tmp)
+                td.text((tmp_size // 4, tmp_size // 4), ch, font=font, fill=(20, 20, 20, 255))
+                rot = tmp.rotate(-90, center=(tmp_size / 2, tmp_size / 2))
+                img.paste(rot, (int(cx - rot.width / 2), int(cy + adv / 2 - rot.height / 2)), rot)
+            cy += adv
+
+
+def render_page(page_path: Path, out_path: Path, bubbles: list[dict[str, Any]],
+                vertical: bool = False) -> None:
     img = Image.open(page_path).convert("RGB")
     draw = ImageDraw.Draw(img)
     for b in bubbles:
@@ -70,6 +143,12 @@ def render_page(page_path: Path, out_path: Path, bubbles: list[dict[str, Any]]) 
         )
         text_pad = max(4, min(w, h) // 12)
         fs = b.get("font_size")
+        if vertical:
+            if not fs:
+                fs = _fit_vertical(b["translated_text"], w, h, text_pad)
+            _draw_vertical(img, draw, b["translated_text"], _load_font(int(fs)), int(fs),
+                           x, y, w, h, text_pad)
+            continue
         if fs:
             # user-specified fixed font size: wrap to box width at that size
             font = _load_font(int(fs))

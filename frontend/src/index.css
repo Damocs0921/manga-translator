@@ -34,6 +34,11 @@ button.primary:hover:not(:disabled) { background: #1d4ed8; }
 }
 .upload-btn input[type="file"] { display: none; }
 .proj-name { color: #9ca3af; }
+.vert-toggle {
+  display: flex; align-items: center; gap: 5px;
+  color: #9ca3af; cursor: pointer; user-select: none; font-size: 13px;
+}
+.vert-toggle input { accent-color: #2563eb; cursor: pointer; }
 .view-toggle { margin-left: auto; display: flex; gap: 0; }
 .view-toggle button { border-radius: 0; }
 .view-toggle button:first-child { border-radius: 6px 0 0 6px; }

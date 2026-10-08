@@ -61,7 +61,7 @@ async def upload(file: UploadFile = File(...)):
         raise HTTPException(400, f"PDF 解析失败: {e}") from e
     pages = [storage.new_page_entry(i, info["file"], info["width"], info["height"])
              for i, info in enumerate(infos)]
-    project = {"id": pid, "name": file.filename, "target_lang": "zh", "pages": pages}
+    project = {"id": pid, "name": file.filename, "target_lang": "zh", "vertical": False, "pages": pages}
     storage.save_project(project)
     return project
 
@@ -82,6 +82,14 @@ async def set_target_lang(pid: str, lang: str):
         raise HTTPException(400, "lang 必须是 zh 或 en")
     proj = _require_project(pid)
     proj["target_lang"] = lang
+    storage.save_project(proj)
+    return proj
+
+
+@app.put("/api/projects/{pid}/vertical")
+async def set_vertical(pid: str, vertical: bool):
+    proj = _require_project(pid)
+    proj["vertical"] = bool(vertical)
     storage.save_project(proj)
     return proj
 
@@ -182,7 +190,7 @@ async def render_page_route(pid: str, page_id: str):
     page = _require_page(proj, page_id)
     src = _page_path(pid, page["file"])
     out = _page_path(pid, f"output/{page_id}.png")
-    await asyncio.to_thread(renderer.render_page, src, out, page["bubbles"])
+    await asyncio.to_thread(renderer.render_page, src, out, page["bubbles"], proj.get("vertical", False))
     page["status"] = "rendered"
     storage.save_project(proj)
     return {"ok": True, "page": page}
@@ -220,6 +228,7 @@ async def start_batch(pid: str, body: dict):
                         _page_path(pid, page["file"]),
                         _page_path(pid, f"output/{pg_id}.png"),
                         page["bubbles"],
+                        p.get("vertical", False),
                     )
                     page["status"] = "rendered"
                 else:
