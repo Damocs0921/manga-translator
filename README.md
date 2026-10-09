@@ -26,21 +26,28 @@ cp backend/.env.example backend/.env
 # 编辑 backend/.env，填入你的 GEMINI_API_KEY
 ```
 
-### 2. 启动后端
+### 2. 安装依赖
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r backend/requirements.txt
-uvicorn backend.main:app --port 8000
+cd frontend && npm install && cd ..
 ```
 
-### 3. 启动前端（另开一个终端）
+### 3. 一键启动
 
 ```bash
-cd frontend
-npm install
-npm run dev
+./start.sh
+```
+
+脚本会同时拉起后端（:8000）和前端（:5173），已在运行的服务会自动跳过。
+
+也可以分别手动启动：
+
+```bash
+uvicorn backend.main:app --port 8000   # 后端
+cd frontend && npm run dev             # 前端
 ```
 
 ### 4. 打开浏览器

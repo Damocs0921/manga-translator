@@ -135,13 +135,13 @@ def render_page(page_path: Path, out_path: Path, bubbles: list[dict[str, Any]],
         if not b.get("translated_text"):
             continue
         x, y, w, h = b["box"]
-        pad_box = 3
+        margin = max(6, min(w, h) // 10)  # keep clear of the bubble border
         # unified white background under translated text
         draw.rectangle(
-            [x + pad_box, y + pad_box, min(img.width, x + w - pad_box), min(img.height, y + h - pad_box)],
+            [x + margin, y + margin, min(img.width, x + w - margin), min(img.height, y + h - margin)],
             fill=(255, 255, 255),
         )
-        text_pad = max(4, min(w, h) // 12)
+        text_pad = margin + 2
         fs = b.get("font_size")
         if vertical:
             if not fs:
