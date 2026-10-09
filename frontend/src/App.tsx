@@ -173,7 +173,10 @@ export default function App() {
               onBubbleClick={b => setSelectedBubbleId(b.id === selectedBubbleId ? null : b.id)}
               onProjectUpdate={setProject}
               onRendered={handleRendered}
-              onTranslated={p => setSelectedBubbleId(p.bubbles[0]?.id ?? null)}
+              onTranslated={p => {
+                setSelectedBubbleId(p.bubbles[0]?.id ?? null);
+                setRenderStamp(Date.now()); // translation now auto-renders the output image
+              }}
               onBubbleGeometry={async (bid, box) => {
                 if (!project || !page) return;
                 try {

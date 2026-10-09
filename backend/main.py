@@ -138,8 +138,13 @@ async def translate_page(pid: str, page_id: str):
     for b, t in zip(page["bubbles"], translations):
         if not b["edited"]:
             b["translated_text"] = t
-    if page["status"] in ("detected", "pending"):
-        page["status"] = "translated"
+    page["status"] = "translated"
+    storage.save_project(proj)
+    # auto-render a preview of the translated page right after translation
+    src = _page_path(pid, page["file"])
+    out = _page_path(pid, f"output/{Path(page['file']).stem}.png")
+    await asyncio.to_thread(renderer.render_page, src, out, page["bubbles"], proj.get("vertical", False))
+    page["status"] = "rendered"
     storage.save_project(proj)
     return page
 
