@@ -163,13 +163,12 @@ export default function BubblePanel({ project, page, selectedBubble, onProjectUp
       </div>
       {error && <div className="error">{error}</div>}
       <div className="panel-actions">
-        <button disabled={busy || locked} onClick={() => handleSave(false)}>{busy ? '保存中…' : '保存'}</button>
-        <button className="primary" disabled={busy || locked} onClick={() => handleSave(true)}>保存并重新渲染</button>
+        <button className="primary" disabled={busy || locked} onClick={() => handleSave(true)}>{busy ? '保存中…' : '保存并重新渲染'}</button>
+        <button className="danger" disabled={busy || locked} onClick={() => onDeleteBubble(selectedBubble.id)}>
+          删除此气泡
+        </button>
         {saved && <span className="saved-flag">已保存 ✓</span>}
       </div>
-      <button className="danger" disabled={busy || locked} onClick={() => onDeleteBubble(selectedBubble.id)}>
-        删除此气泡
-      </button>
     </aside>
   );
 }

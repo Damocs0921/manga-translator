@@ -149,7 +149,7 @@ button.primary:hover:not(:disabled) { background: #1d4ed8; }
 .panel-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .saved-flag { color: #22c55e; font-size: 12px; }
 button.danger {
-  margin-top: 12px; width: 100%;
+  font-size: 12px; padding: 6px 12px; height: 34px;
   background: #7f1d1d; border-color: #b91c1c; color: #fecaca;
 }
 button.danger:hover:not(:disabled) { background: #991b1b; }
