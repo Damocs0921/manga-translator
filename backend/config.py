@@ -26,6 +26,7 @@ DATA_DIR: Path = Path(__file__).resolve().parent.parent / "data"
 # Text rendering fonts (first existing one wins)
 FONT_CANDIDATES: list[str] = [
     os.environ.get("FONT_PATH", ""),
+    str(Path(__file__).resolve().parent / "assets" / "LXGWWenKai-Regular.ttf"),  # 楷体
     "/System/Library/Fonts/PingFang.ttc",
     "/System/Library/Fonts/Hiragino Sans GB.ttc",
     "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
